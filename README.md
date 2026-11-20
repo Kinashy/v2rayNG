@@ -1,5 +1,11 @@
 # v2rayNG
 
+This fork builds **Cascade VPN**, a preconfigured Android client with a separate
+application ID. Download it from [this fork's Releases](https://github.com/Kinashy/v2rayNG/releases).
+See [the distribution guide](cascade/README.md) for defaults, asset repair,
+automatic stable-release builds, and update behavior. The upstream source below
+is retained for reference; release APKs use the exact stable tag plus `cascade/`.
+
 A V2Ray client for Android, support [Xray core](https://github.com/XTLS/Xray-core) and [v2fly core](https://github.com/v2fly/v2ray-core)
 
 [![API](https://img.shields.io/badge/API-24%2B-yellow.svg?style=flat)](https://developer.android.com/about/versions/lollipop)

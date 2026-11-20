@@ -1,0 +1,150 @@
+{
+  "pref_use_hev_tunnel_v2": {
+    "type": "b",
+    "value": true
+  },
+  "pref_dynamic_socks_port": {
+    "type": "b",
+    "value": false
+  },
+  "pref_enable_local_proxy": {
+    "type": "b",
+    "value": true
+  },
+  "pref_socks_enable_udp": {
+    "type": "b",
+    "value": true
+  },
+  "pref_append_http_proxy": {
+    "type": "b",
+    "value": false
+  },
+  "pref_mux_enabled": {
+    "type": "b",
+    "value": true
+  },
+  "pref_route_only_enabled": {
+    "type": "b",
+    "value": true
+  },
+  "pref_vpn_dns": {
+    "type": "s",
+    "value": "1.1.1.1"
+  },
+  "pref_ip_api_url": {
+    "type": "s",
+    "value": "https://api.ip.sb/geoip"
+  },
+  "pref_prefer_ipv6": {
+    "type": "b",
+    "value": false
+  },
+  "pref_proxy_sharing_enabled": {
+    "type": "b",
+    "value": false
+  },
+  "pref_language": {
+    "type": "s",
+    "value": "auto"
+  },
+  "pref_observatory_least_load_timeout": {
+    "type": "s",
+    "value": "30s"
+  },
+  "pref_observatory_least_load_interval": {
+    "type": "s",
+    "value": "5m"
+  },
+  "pref_local_dns_enabled": {
+    "type": "b",
+    "value": false
+  },
+  "pref_bypass_apps": {
+    "type": "b",
+    "value": false
+  },
+  "pref_fragment_length": {
+    "type": "s",
+    "value": "50-100"
+  },
+  "pref_mux_concurrency": {
+    "type": "s",
+    "value": "8"
+  },
+  "pref_observatory_least_load_method": {
+    "type": "s",
+    "value": "HEAD"
+  },
+  "pref_hev_tunnel_rw_timeout_v2": {
+    "type": "s",
+    "value": "300,60"
+  },
+  "pref_fragment_maxsplit": {
+    "type": "s",
+    "value": "10"
+  },
+  "pref_fragment_interval": {
+    "type": "s",
+    "value": "10-20"
+  },
+  "pref_mux_xudp_concurrency": {
+    "type": "s",
+    "value": "8"
+  },
+  "pref_routing_domain_strategy": {
+    "type": "s",
+    "value": "IPOnDemand"
+  },
+  "pref_per_app_proxy": {
+    "type": "b",
+    "value": true
+  },
+  "pref_mode": {
+    "type": "s",
+    "value": "VPN"
+  },
+  "pref_remote_dns": {
+    "type": "s",
+    "value": "https://cloudflare-dns.com/dns-query"
+  },
+  "pref_geo_files_sources": {
+    "type": "s",
+    "value": "runetfreedom/russia-v2ray-rules-dat"
+  },
+  "pref_observatory_least_ping_interval": {
+    "type": "s",
+    "value": "3m"
+  },
+  "pref_observatory_least_load_sampling": {
+    "type": "s",
+    "value": "2"
+  },
+  "pref_delay_test_url": {
+    "type": "s",
+    "value": "https://www.gstatic.com/generate_204"
+  },
+  "pref_socks_port": {
+    "type": "s",
+    "value": "10808"
+  },
+  "pref_domestic_dns": {
+    "type": "s",
+    "value": "223.5.5.5"
+  },
+  "pref_vpn_mtu": {
+    "type": "s",
+    "value": "1500"
+  },
+  "pref_sniffing_enabled": {
+    "type": "b",
+    "value": true
+  },
+  "pref_is_booted": {
+    "type": "b",
+    "value": false
+  },
+  "pref_root_mode_enabled": {
+    "type": "b",
+    "value": false
+  }
+}

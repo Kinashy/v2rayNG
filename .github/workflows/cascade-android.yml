@@ -1,0 +1,196 @@
+name: Cascade Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: Stable v2rayNG tag (empty selects the latest stable release)
+        required: false
+        type: string
+        default: ''
+  schedule:
+    - cron: '43 */12 * * *'
+  push:
+    branches: [master]
+    paths:
+      - cascade/**
+      - .github/workflows/cascade-android.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cascade-android-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      upstream_tag: ${{ steps.plan.outputs.upstream_tag }}
+      version: ${{ steps.plan.outputs.version }}
+      release_tag: ${{ steps.plan.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate distribution scripts
+        run: python3 -m unittest discover -s cascade/tests -v
+      - name: Select a stable upstream release
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+        run: python3 cascade/release.py plan --tag "$UPSTREAM_TAG"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Checkout exact stable sources and native gitlinks
+        uses: actions/checkout@v7
+        with:
+          repository: 2dust/v2rayNG
+          ref: ${{ needs.plan.outputs.upstream_tag }}
+          path: source
+          submodules: recursive
+          fetch-depth: 0
+      - name: Apply distribution defaults
+        env:
+          UPSTREAM_TAG: ${{ needs.plan.outputs.upstream_tag }}
+        run: python3 cascade/prepare.py --source source --upstream-tag "$UPSTREAM_TAG"
+      - name: Get pinned native AAR and verified geodata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git -C source/AndroidLibXrayLite fetch --tags
+          python3 cascade/release.py inputs --source source
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          log-accepted-android-sdk-licenses: false
+          cmdline-tools-version: '14742923'
+          packages: platforms;android-37.0 build-tools;37.0.0 platform-tools
+      - name: Install native toolchain
+        run: |
+          sdkmanager --install 'ndk;30.0.16248370'
+          echo "NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> "$GITHUB_ENV"
+      - name: Build native libraries for all supported ABIs
+        working-directory: source
+        run: |
+          bash compile-hevtun.sh
+          cp -r libs/* V2rayNG/app/libs/
+      - name: Setup Java
+        uses: actions/setup-java@v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Configure Gradle
+        working-directory: source/V2rayNG
+        run: |
+          chmod +x gradlew
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+      - name: Run regression tests and assemble debug client
+        working-directory: source/V2rayNG
+        run: |
+          ./gradlew :app:testPlaystoreDebugUnitTest --tests 'com.v2ray.ang.handler.CascadeDefaultsTest' --tests 'com.v2ray.ang.service.PerAppRoutingTest'
+          ./gradlew :app:testPlaystoreDebugUnitTest :app:compilePlaystoreDebugKotlin :app:assemblePlaystoreDebug :app:assemblePlaystoreDebugAndroidTest
+      - name: Sign release with the persistent distribution key
+        working-directory: source/V2rayNG
+        env:
+          CASCADE_KEYSTORE_BASE64: ${{ secrets.CASCADE_KEYSTORE_BASE64 }}
+          CASCADE_KEYSTORE_PASSWORD: ${{ secrets.CASCADE_KEYSTORE_PASSWORD }}
+          CASCADE_KEY_ALIAS: ${{ secrets.CASCADE_KEY_ALIAS }}
+        run: |
+          test -n "$CASCADE_KEYSTORE_BASE64"
+          umask 077
+          printf '%s' "$CASCADE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cascade-release.p12"
+          trap 'rm -f "$RUNNER_TEMP/cascade-release.p12"' EXIT
+          ./gradlew :app:assemblePlaystoreRelease :app:licensePlaystoreReleaseReport \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/cascade-release.p12" \
+            -Pandroid.injected.signing.store.password="$CASCADE_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$CASCADE_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$CASCADE_KEYSTORE_PASSWORD"
+          for apk in app/build/outputs/apk/playstore/release/*.apk; do
+            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose "$apk"
+          done
+      - name: Verify APK contents and package release
+        run: python3 cascade/release.py package --source source --output release
+      - name: Upload release candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+      - name: Upload emulator inputs
+        uses: actions/upload-artifact@v7
+        with:
+          name: emulator
+          path: |
+            source/V2rayNG/app/build/outputs/apk/playstore/debug/*x86_64*.apk
+            source/V2rayNG/app/build/outputs/apk/androidTest/playstore/debug/*.apk
+          if-no-files-found: error
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: source/V2rayNG/app/build/reports/tests/
+
+  android-smoke:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: emulator
+          path: emulator
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Check installation, profile preservation and missing-asset repair
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: python3 cascade/smoke.py --directory emulator
+
+  publish:
+    needs: [plan, build, android-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: release
+      - name: Publish the checked release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.plan.outputs.release_tag }}
+          UPSTREAM_TAG: ${{ needs.plan.outputs.upstream_tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          cat > notes.md <<EOF
+          Cascade VPN $VERSION, based on v2rayNG $UPSTREAM_TAG.
+
+          Install the universal APK, then import your personal profile by QR or clipboard.
+          DNS, routing, selected applications and verified geodata are included.
+          Missing required assets are restored; existing user data is preserved.
+
+          JVM tests, debug assembly, APK verification and Android emulator preservation checks passed.
+          Not run: real VPN connection and physical-device acceptance with a user's profile.
+          EOF
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title "Cascade VPN $VERSION" --notes-file notes.md
+          fi
+          gh release upload "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest --notes-file notes.md
