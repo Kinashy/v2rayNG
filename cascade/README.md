@@ -20,7 +20,18 @@ can change their selection in the regular per-app settings.
 ## Existing installations and assets
 
 Distribution defaults fill absent setting keys, including on later launches.
-Existing false, empty, and customized values are retained. Profile, subscription,
+Existing false, empty, and customized values are retained, with one versioned
+exception for the complete factory DNS tuple from releases .1/.2. On the first
+launch after upgrading, local DNS is enabled, Remote and Domestic DNS both use
+`https://1.1.1.1/dns-query`, and Fake DNS is disabled. VPN DNS remains the IP
+`1.1.1.1`. This replaces the previous tuple of disabled local DNS,
+`https://cloudflare-dns.com/dns-query`, and unencrypted `223.5.5.5`.
+
+Changing any of those legacy DNS values or enabling Fake DNS preserves the user's
+DNS tuple. Migration is recorded once; later user changes are retained even if
+they restore an old value. Seeding and migration share the MMKV settings lock and
+roll back changed values on a failed write. Profiles are not reimported.
+Profile, subscription,
 selected-server, and statistics stores are never seeded by the distribution.
 
 When the main client initializes its assets, missing `geoip.dat` and `geosite.dat`
@@ -74,11 +85,14 @@ Android source is attached to each release as `source.zip`.
 
 ## Validation and signing
 
-The workflow runs distribution script tests, Kotlin regression tests, the full
+The workflow runs distribution script tests, Kotlin regression tests (including
+legacy DNS migration, custom values, rollback and retry), the full
 Play Store debug JVM suite, debug compilation and assembly, and signed release
 assembly. It verifies all four native ABIs, the universal APK, and packaged DAT
 hashes. An Android emulator checks a fresh installation, dummy-profile import,
-reinstallation with profile/settings preservation, and missing-asset repair.
+reinstallation with profile/settings preservation, missing-asset repair, and
+migration of the previous release's DNS values after reinstall. It also checks
+that the generated native configuration includes DoH and the DNS port-53 route.
 Publication occurs only after these checks pass.
 
 Not run by this workflow: a real VPN connection using a personal server profile,

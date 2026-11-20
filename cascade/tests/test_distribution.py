@@ -22,6 +22,11 @@ class DistributionTests(unittest.TestCase):
         self.assertIn("com.microsoft.teams", apps)
         self.assertTrue(settings["pref_per_app_proxy"]["value"])
         self.assertFalse(settings["pref_bypass_apps"]["value"])
+        self.assertTrue(settings["pref_local_dns_enabled"]["value"])
+        self.assertFalse(settings["pref_fake_dns_enabled"]["value"])
+        self.assertEqual("https://1.1.1.1/dns-query", settings["pref_remote_dns"]["value"])
+        self.assertEqual("https://1.1.1.1/dns-query", settings["pref_domestic_dns"]["value"])
+        self.assertEqual("1.1.1.1", settings["pref_vpn_dns"]["value"])
         self.assertNotIn("SERVER_CONFIG", json.dumps(settings))
 
     def test_changed_upstream_anchor_stops_preparation(self):

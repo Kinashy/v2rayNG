@@ -1,10 +1,22 @@
 
-    /** Seed absent distribution settings; never overwrite user choices or profile stores. */
+    /** Upgrade only the old factory DNS tuple; keep custom choices and profile stores. */
     fun ensureCascadeDefaults() = synchronized(settingsStorage) {
         settingsStorage.lock()
         try {
-            CascadeDefaults.addMissing(
-                settingsStorage.allKeys().orEmpty().toSet(), CascadeDefaults.settings,
+            val keys = settingsStorage.allKeys().orEmpty().toSet()
+            val types = CascadeDefaults.settings +
+                (CascadeDefaults.DNS_MIGRATION_KEY to CascadeDefaults.DNS_MIGRATION_VERSION)
+            val existing = types.filterKeys { it in keys }.mapValues { (key, value) ->
+                when (value) {
+                    is String -> settingsStorage.decodeString(key).orEmpty()
+                    is Boolean -> settingsStorage.decodeBool(key)
+                    is Int -> settingsStorage.decodeInt(key)
+                    is Set<*> -> settingsStorage.decodeStringSet(key).orEmpty()
+                    else -> error("Unsupported distribution setting type")
+                }
+            }
+            CascadeDefaults.applySettings(
+                existing,
                 { key, value ->
                     when (value) {
                         is String -> settingsStorage.encode(key, value)
@@ -16,6 +28,9 @@
                 },
                 { settingsStorage.remove(it) }
             )
+        } catch (error: Exception) {
+            LogUtil.e(TAG, "Distribution settings migration failed", error)
+            throw error
         } finally {
             settingsStorage.unlock()
         }

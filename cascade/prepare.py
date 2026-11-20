@@ -120,6 +120,9 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
     closing = mmkv.rfind("}")
     if closing < 0 or "private val assetStorage" not in mmkv or "private val settingsStorage" not in mmkv:
         raise ValueError("Upstream MMKV ownership changed; review required")
+    mmkv = replace_once(mmkv, "import com.v2ray.ang.util.JsonUtil",
+                        "import com.v2ray.ang.util.JsonUtil\nimport com.v2ray.ang.util.LogUtil", "settings migration logging")
+    closing = mmkv.rfind("}")
     mmkv = mmkv[:closing] + (HERE / "kotlin/MmkvCascade.kt.inc").read_text(encoding="utf-8") + mmkv[closing:]
 
     settings_path = source / JAVA / "handler/SettingsManager.kt"
@@ -233,6 +236,7 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
         "routing_sha256": policy["files"]["routing.json"], "apps_sha256": policy["files"]["apps.json"],
         "settings_sha256": config["settings_sha256"],
         "profile_count": 0, "asset_repair": "missing files and entries only; preserve existing contents",
+        "dns_migration": "v1: replace the complete legacy factory DNS tuple once; preserve custom settings",
     }
     (source / "cascade-build.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report

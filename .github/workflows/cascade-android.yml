@@ -215,9 +215,12 @@ jobs:
 
           Install the universal APK, then import your personal profile by QR or clipboard.
           DNS, routing, selected applications and verified geodata are included.
+          On first launch, the old factory DNS settings are upgraded automatically:
+          local DNS enabled, Remote/Domestic DNS over HTTPS, Fake DNS disabled.
+          Customized DNS values and all personal profiles are retained.
           Missing required assets are restored; existing user data is preserved.
 
-          JVM tests, debug assembly, APK verification and Android emulator preservation checks passed.
+          JVM tests, debug assembly, APK verification and Android emulator preservation/DNS migration checks passed.
           Not run: real VPN connection and physical-device acceptance with a user's profile.
           EOF
           if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then

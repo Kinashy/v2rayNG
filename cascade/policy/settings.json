@@ -57,6 +57,10 @@
   },
   "pref_local_dns_enabled": {
     "type": "b",
+    "value": true
+  },
+  "pref_fake_dns_enabled": {
+    "type": "b",
     "value": false
   },
   "pref_bypass_apps": {
@@ -105,7 +109,7 @@
   },
   "pref_remote_dns": {
     "type": "s",
-    "value": "https://cloudflare-dns.com/dns-query"
+    "value": "https://1.1.1.1/dns-query"
   },
   "pref_geo_files_sources": {
     "type": "s",
@@ -129,7 +133,7 @@
   },
   "pref_domestic_dns": {
     "type": "s",
-    "value": "223.5.5.5"
+    "value": "https://1.1.1.1/dns-query"
   },
   "pref_vpn_mtu": {
     "type": "s",

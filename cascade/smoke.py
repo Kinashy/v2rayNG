@@ -19,8 +19,8 @@ if __name__ == "__main__":
     package = "net.kinashy.cascadevpn"
     adb("install", "-r", app)
     adb("install", "-r", tests)
-    for method in ("seedUserData", "verifyAfterReinstall"):
-        if method == "verifyAfterReinstall":
+    for method in ("seedUserData", "verifyAfterReinstall", "seedLegacyDnsForUpgrade", "verifyAfterDnsUpgrade"):
+        if method in ("verifyAfterReinstall", "verifyAfterDnsUpgrade"):
             adb("shell", "am", "force-stop", package)
             adb("install", "-r", app)
         result = adb("shell", "am", "instrument", "-w", "-e", "class",

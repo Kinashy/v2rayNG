@@ -27,8 +27,8 @@ class CascadeDefaultsTest {
     @Test
     fun repairsMissingDefaultsWithoutResettingUserChoices() {
         val stored = mutableMapOf<String, Any>("pref_per_app_proxy" to false, "pref_remote_dns" to "")
-        fun repair() = CascadeDefaults.addMissing(
-            stored.keys.toSet(), CascadeDefaults.settings,
+        fun repair() = CascadeDefaults.applySettings(
+            stored.toMap(),
             { key, value -> stored[key] = value; true }, { stored.remove(it) }
         )
         repair()
@@ -40,6 +40,89 @@ class CascadeDefaultsTest {
         assertEquals("IPOnDemand", stored["pref_routing_domain_strategy"])
         assertTrue((stored["pref_per_app_proxy_set"] as Set<*>).contains("com.microsoft.teams"))
         assertTrue(stored.keys.none { it.contains("password") || it.contains("subscription") })
+    }
+
+    private fun legacySettings(): MutableMap<String, Any> = CascadeDefaults.settings.toMutableMap().apply {
+        this["pref_local_dns_enabled"] = false
+        this["pref_remote_dns"] = "https://cloudflare-dns.com/dns-query"
+        this["pref_domestic_dns"] = "223.5.5.5"
+        remove("pref_fake_dns_enabled")
+    }
+
+    private fun upgrade(stored: MutableMap<String, Any>) = CascadeDefaults.applySettings(
+        stored.toMap(), { key, value -> stored[key] = value; true }, { stored.remove(it) }
+    )
+
+    @Test
+    fun upgradesThePreviousReleaseDnsOnceAndKeepsOtherData() {
+        val stored = legacySettings().apply {
+            this["pref_per_app_proxy"] = false
+            this["selected_server_fixture"] = "unchanged"
+        }
+        val originalRouting = stored["pref_routing_ruleset"]
+        val originalApps = stored["pref_per_app_proxy_set"]
+        upgrade(stored)
+        assertEquals(true, stored["pref_local_dns_enabled"])
+        assertEquals(false, stored["pref_fake_dns_enabled"])
+        assertEquals("https://1.1.1.1/dns-query", stored["pref_remote_dns"])
+        assertEquals("https://1.1.1.1/dns-query", stored["pref_domestic_dns"])
+        assertEquals("1.1.1.1", stored["pref_vpn_dns"])
+        assertEquals(CascadeDefaults.DNS_MIGRATION_VERSION, stored[CascadeDefaults.DNS_MIGRATION_KEY])
+        assertEquals(false, stored["pref_per_app_proxy"])
+        assertEquals("unchanged", stored["selected_server_fixture"])
+        assertEquals(originalRouting, stored["pref_routing_ruleset"])
+        assertEquals(originalApps, stored["pref_per_app_proxy_set"])
+        stored["pref_local_dns_enabled"] = false
+        stored["pref_remote_dns"] = "https://example.invalid/custom-dns"
+        val customized = stored.toMap()
+        upgrade(stored)
+        assertEquals(customized, stored)
+    }
+
+    @Test
+    fun leavesACustomDnsTupleAndFutureMigrationVersionsAlone() {
+        for ((key, value) in listOf(
+            "pref_remote_dns" to "https://example.invalid/custom-dns",
+            "pref_remote_dns" to "",
+            "pref_domestic_dns" to "9.9.9.9",
+            "pref_local_dns_enabled" to true,
+            "pref_fake_dns_enabled" to true,
+            CascadeDefaults.DNS_MIGRATION_KEY to 99
+        )) {
+            val stored = legacySettings().apply { this[key] = value }
+            val before = stored.toMap()
+            upgrade(stored)
+            before.forEach { (oldKey, oldValue) -> assertEquals(oldValue, stored[oldKey]) }
+            val firstUpgrade = stored.toMap()
+            upgrade(stored)
+            assertEquals(firstUpgrade, stored)
+        }
+    }
+
+    @Test
+    fun rollsBackEveryDnsWriteIncludingTheMigrationMarkerAndCanRetry() {
+        for (throws in listOf(false, true)) {
+            for (failedKey in listOf("pref_fake_dns_enabled", "pref_local_dns_enabled",
+                "pref_remote_dns", "pref_domestic_dns", CascadeDefaults.DNS_MIGRATION_KEY)) {
+                val stored = legacySettings()
+                val before = stored.toMap()
+                var failed = false
+                assertThrows(Exception::class.java) {
+                    CascadeDefaults.applySettings(before, { key, value ->
+                        stored[key] = value
+                        if (key == failedKey && !failed) {
+                            failed = true
+                            if (throws) throw IOException("Simulated write interruption")
+                            false
+                        } else true
+                    }, { stored.remove(it) })
+                }
+                assertEquals(before, stored)
+                upgrade(stored)
+                assertEquals(true, stored["pref_local_dns_enabled"])
+                assertEquals(CascadeDefaults.DNS_MIGRATION_VERSION, stored[CascadeDefaults.DNS_MIGRATION_KEY])
+            }
+        }
     }
 
     @Test

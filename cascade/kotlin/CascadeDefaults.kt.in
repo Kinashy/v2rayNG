@@ -6,6 +6,9 @@ import java.io.InputStream
 
 /** Distribution defaults and their repair policy; user profiles remain owned by upstream. */
 internal object CascadeDefaults {
+    const val DNS_MIGRATION_KEY = "cascade_dns_defaults_version"
+    const val DNS_MIGRATION_VERSION = 1
+
     val settings: Map<String, Any> = linkedMapOf(
 @SETTINGS@
     )
@@ -13,6 +16,52 @@ internal object CascadeDefaults {
     val assetSources: Map<String, String> = linkedMapOf(
 @ASSETS@
     )
+
+    /** Only the complete factory DNS tuple from releases .1/.2 is eligible for replacement. */
+    private val legacyDnsSettings: Map<String, Any> = linkedMapOf(
+        "pref_local_dns_enabled" to false,
+        "pref_remote_dns" to "https://cloudflare-dns.com/dns-query",
+        "pref_domestic_dns" to "223.5.5.5"
+    )
+
+    /** Seed and migrate in one locked transaction; restore old values if any write fails. */
+    fun applySettings(
+        existing: Map<String, Any>,
+        write: (String, Any) -> Boolean,
+        remove: (String) -> Unit
+    ) {
+        val changes = settings.filterKeys { it !in existing }.toMutableMap()
+        if ((existing[DNS_MIGRATION_KEY] as? Int ?: 0) < DNS_MIGRATION_VERSION) {
+            if (legacyDnsSettings.all { (key, value) -> existing[key] == value } &&
+                (existing["pref_fake_dns_enabled"] == null || existing["pref_fake_dns_enabled"] == false)
+            ) {
+                (legacyDnsSettings.keys + "pref_fake_dns_enabled").forEach { key ->
+                    changes[key] = settings.getValue(key)
+                }
+            }
+            changes[DNS_MIGRATION_KEY] = DNS_MIGRATION_VERSION
+        }
+        val written = mutableListOf<String>()
+        try {
+            changes.forEach { (key, value) ->
+                written.add(key)
+                check(write(key, value)) { "Failed to persist distribution settings" }
+            }
+        } catch (error: Exception) {
+            written.asReversed().forEach { key ->
+                try {
+                    if (key in existing) {
+                        check(write(key, existing.getValue(key))) { "Failed to restore distribution settings" }
+                    } else {
+                        remove(key)
+                    }
+                } catch (rollbackError: Exception) {
+                    error.addSuppressed(rollbackError)
+                }
+            }
+            throw error
+        }
+    }
 
     /** Call while holding the owning MMKV store lock. Existing keys include false/empty values. */
     fun <T> addMissing(
