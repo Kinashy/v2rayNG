@@ -151,6 +151,40 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
         '    // Cascade always packages the pinned Xray AAR, independently of its application ID.\n    fun isXray(): Boolean = true',
         "native core identity")
 
+    asset_view_model_path = source / JAVA / "ui/userasset/UserAssetViewModel.kt"
+    asset_view_model = asset_view_model_path.read_text(encoding="utf-8")
+    asset_view_model = replace_once(asset_view_model, "import com.v2ray.ang.handler.MmkvManager",
+        "import com.v2ray.ang.handler.CascadeDefaults\nimport com.v2ray.ang.handler.MmkvManager", "asset mutation owner")
+    asset_view_model = replace_function(asset_view_model, "    private fun tryDownload(", '''    private fun tryDownload(
+        item: AssetUrlItem,
+        extDir: File,
+        httpPort: Int,
+        proxyUsername: String? = null,
+        proxyPassword: String? = null
+    ): Boolean {
+        var temporary: File? = null
+        try {
+            val staged = File.createTempFile(".cascade-download-", ".tmp", extDir)
+            temporary = staged
+            val target = File(extDir, item.remarks)
+            if (HttpUtil.downloadToFile(
+                    UrlContentRequest(
+                        url = item.url, timeout = 15000, httpPort = httpPort,
+                        proxyUsername = proxyUsername, proxyPassword = proxyPassword
+                    ), staged
+                )) {
+                val replaced = CascadeDefaults.replaceAssetFile(staged, target)
+                if (!replaced) LogUtil.e(AppConfig.TAG, "Failed to replace geo file: ${item.remarks}")
+                return replaced
+            }
+        } catch (error: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to download geo file: ${item.remarks}", error)
+        } finally {
+            temporary?.delete()
+        }
+        return false
+    }''')
+
     service_path = source / JAVA / "service/CoreVpnService.kt"
     service = service_path.read_text(encoding="utf-8")
     service = replace_once(service, "        configurePerAppProxy(builder)", "        if (!configurePerAppProxy(builder)) return false", "per-app start guard")
@@ -175,7 +209,7 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
     }''')
 
     # Validate all anchors before touching the checkout.
-    for path, content in ((gradle_path, gradle), (mmkv_path, mmkv), (settings_path, manager), (app_config_path, app_config), (utils_path, utils), (service_path, service)):
+    for path, content in ((gradle_path, gradle), (mmkv_path, mmkv), (settings_path, manager), (app_config_path, app_config), (utils_path, utils), (asset_view_model_path, asset_view_model), (service_path, service)):
         path.write_text(content, encoding="utf-8", newline="\n")
     (source / JAVA / "handler/CascadeDefaults.kt").write_text(defaults, encoding="utf-8", newline="\n")
     for template, destination in (

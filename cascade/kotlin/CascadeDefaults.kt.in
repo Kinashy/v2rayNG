@@ -39,6 +39,7 @@ internal object CascadeDefaults {
         assetSources.filterKeys { it !in existingNames }
 
     /** Copy to the same directory, then rename; a failed read must not leave a partial DAT. */
+    @Synchronized
     fun copyMissingAsset(target: File, open: () -> InputStream): Boolean {
         if (target.exists()) return false
         check(target.parentFile?.isDirectory == true) { "Asset directory does not exist" }
@@ -56,5 +57,13 @@ internal object CascadeDefaults {
         } finally {
             temporary.delete()
         }
+    }
+
+    /** Share the restore monitor so a manual update can commit only a complete downloaded file. */
+    @Synchronized
+    fun replaceAssetFile(temporary: File, target: File): Boolean {
+        if (temporary.renameTo(target)) return true
+        temporary.delete()
+        return false
     }
 }

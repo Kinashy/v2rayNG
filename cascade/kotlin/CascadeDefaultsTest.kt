@@ -10,6 +10,10 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class CascadeDefaultsTest {
     @TempDir
@@ -88,5 +92,60 @@ class CascadeDefaultsTest {
         assertFalse(target.exists())
         assertTrue(directory.listFiles().orEmpty().isEmpty())
         assertTrue(CascadeDefaults.copyMissingAsset(target) { "complete".byteInputStream() })
+    }
+
+    @Test
+    fun failedManualReplacementKeepsTheExistingTarget() {
+        val target = File(directory, "directory.dat").apply { mkdir() }
+        val existing = File(target, "user").apply { writeText("preserved") }
+        val staged = File(directory, "download.tmp").apply { writeText("new") }
+        assertFalse(CascadeDefaults.replaceAssetFile(staged, target))
+        assertEquals("preserved", existing.readText())
+        assertFalse(staged.exists())
+    }
+
+    @Test
+    fun restoreAfterAManualUpdateDoesNotReadOrReplaceTheBundledFile() {
+        val target = File(directory, "geoip.dat")
+        val staged = File(directory, "download.tmp").apply { writeText("user update") }
+        assertTrue(CascadeDefaults.replaceAssetFile(staged, target))
+        assertFalse(CascadeDefaults.copyMissingAsset(target) { error("Must not restore over an update") })
+        assertEquals("user update", target.readText())
+    }
+
+    @Test
+    fun manualCommitWaitsUntilAnInProgressRestoreFinishes() {
+        val target = File(directory, "geosite.dat")
+        val staged = File(directory, "download.tmp").apply { writeText("user update") }
+        val copyEntered = CountDownLatch(1)
+        val releaseCopy = CountDownLatch(1)
+        val commitEntered = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val restore = pool.submit<Boolean> {
+                CascadeDefaults.copyMissingAsset(target) {
+                    copyEntered.countDown()
+                    check(releaseCopy.await(5, TimeUnit.SECONDS))
+                    "bundled".byteInputStream()
+                }
+            }
+            assertTrue(copyEntered.await(5, TimeUnit.SECONDS))
+            val update = pool.submit<Boolean> {
+                commitEntered.countDown()
+                CascadeDefaults.replaceAssetFile(staged, target)
+            }
+            assertTrue(commitEntered.await(5, TimeUnit.SECONDS))
+            assertThrows(TimeoutException::class.java) { update.get(100, TimeUnit.MILLISECONDS) }
+            releaseCopy.countDown()
+            assertTrue(restore.get(5, TimeUnit.SECONDS))
+            val replaced = update.get(5, TimeUnit.SECONDS)
+            // Android/Linux can replace an existing target; Windows may reject the rename.
+            assertEquals(if (replaced) "user update" else "bundled", target.readText())
+            assertFalse(staged.exists())
+        } finally {
+            releaseCopy.countDown()
+            pool.shutdownNow()
+            assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS))
+        }
     }
 }

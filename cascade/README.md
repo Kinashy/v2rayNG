@@ -29,6 +29,17 @@ user's existing source URL and GUID. Missing files are copied from the APK using
 a temporary file and rename. Existing files are retained, including newer or
 custom databases. A failed copy leaves no partial target and is retried next time.
 
+Automatic restoration and the normal asset downloader share one mutation lock.
+Each download has a unique temporary file and acquires the lock only to commit
+the completed download. If restoration is already copying a missing file, the
+manual update commits afterward. If a manual update commits first, restoration
+sees the existing file and skips it.
+
+Repair checks presence, not the validity of an existing user file. It retains a
+zero-byte or incompatible existing database and does not remove pre-existing
+duplicate entries. Restoring one missing database also does not replace the
+other, so a user-customized pair can contain different database versions.
+
 The packaged databases come from the same stable
 `runetfreedom/russia-v2ray-rules-dat` release, verified against release digests,
 sizes, and SHA-256 checksum files. Their exact version and hashes appear in

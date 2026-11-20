@@ -11,6 +11,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 @RunWith(AndroidJUnit4::class)
 class CascadeBootstrapTest {
@@ -30,6 +34,7 @@ class CascadeBootstrapTest {
         for (name in listOf("geoip.dat", "geosite.dat")) {
             assertTrue(File(Utils.userAssetPath(context), name).length() > 0)
         }
+        verifyConcurrentAssetMutation()
         val link = "vless://00000000-0000-4000-8000-000000000001@example.invalid:443?encryption=none&security=tls&type=ws&host=example.invalid&path=%2F&sni=example.invalid#Cascade-test"
         assertEquals(1, AngConfigManager.importBatchConfig(link, AppConfig.DEFAULT_SUBSCRIPTION_ID, true).first)
         val guid = MmkvManager.decodeAllServerList().single()
@@ -65,5 +70,49 @@ class CascadeBootstrapTest {
         assertEquals(1, MmkvManager.decodeAssetUrls().count { it.assetUrl.remarks == "geosite.dat" })
         assertTrue(File(Utils.userAssetPath(context), "geosite.dat").length() > 0)
         assertEquals("user asset", File(Utils.userAssetPath(context), "custom.dat").readText())
+    }
+
+    private fun verifyConcurrentAssetMutation() {
+        val directory = File(context.cacheDir, "cascade-asset-race").apply { mkdirs() }
+        val target = File(directory, "test.dat")
+        val staged = File(directory, "download.tmp").apply { writeText("manual update") }
+        val copyEntered = CountDownLatch(1)
+        val releaseCopy = CountDownLatch(1)
+        val commitEntered = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val restore = pool.submit<Boolean> {
+                CascadeDefaults.copyMissingAsset(target) {
+                    copyEntered.countDown()
+                    check(releaseCopy.await(5, TimeUnit.SECONDS))
+                    "bundled".byteInputStream()
+                }
+            }
+            assertTrue(copyEntered.await(5, TimeUnit.SECONDS))
+            val update = pool.submit<Boolean> {
+                commitEntered.countDown()
+                CascadeDefaults.replaceAssetFile(staged, target)
+            }
+            assertTrue(commitEntered.await(5, TimeUnit.SECONDS))
+            var committedTooSoon = false
+            try {
+                update.get(100, TimeUnit.MILLISECONDS)
+                committedTooSoon = true
+            } catch (expected: TimeoutException) {
+                // The restore owns the common mutation lock until its file is complete.
+            }
+            assertFalse(committedTooSoon)
+            releaseCopy.countDown()
+            assertTrue(restore.get(5, TimeUnit.SECONDS))
+            assertTrue(update.get(5, TimeUnit.SECONDS))
+            assertEquals("manual update", target.readText())
+        } finally {
+            releaseCopy.countDown()
+            pool.shutdownNow()
+            pool.awaitTermination(5, TimeUnit.SECONDS)
+            staged.delete()
+            target.delete()
+            directory.delete()
+        }
     }
 }
