@@ -23,6 +23,8 @@ class CascadeBootstrapTest {
         assertTrue(MmkvManager.decodeAllServerList().isEmpty())
         assertEquals(24, MmkvManager.decodeRoutingRulesets()!!.size)
         assertEquals("IPOnDemand", MmkvManager.decodeSettingsString(AppConfig.PREF_ROUTING_DOMAIN_STRATEGY))
+        assertTrue(Utils.isXray())
+        assertEquals(SettingsManager.getSocksPort(), SettingsManager.getHttpPort())
         assertTrue(MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY))
         assertFalse(MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS))
         for (name in listOf("geoip.dat", "geosite.dat")) {

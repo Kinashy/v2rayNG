@@ -144,6 +144,13 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
     app_config = replace_once(app_config, 'const val APP_URL = "$GITHUB_URL/2dust/v2rayNG"', f'const val APP_URL = "$GITHUB_URL/{config["repository"]}"', "project URL")
     app_config = replace_once(app_config, 'const val APP_API_URL = "https://api.github.com/repos/2dust/v2rayNG/releases"', f'const val APP_API_URL = "https://api.github.com/repos/{config["repository"]}/releases"', "update URL")
 
+    utils_path = source / JAVA / "util/Utils.kt"
+    utils = utils_path.read_text(encoding="utf-8")
+    utils = replace_once(utils,
+        '    fun isXray(): Boolean = BuildConfig.APPLICATION_ID.startsWith("com.v2ray.ang")',
+        '    // Cascade always packages the pinned Xray AAR, independently of its application ID.\n    fun isXray(): Boolean = true',
+        "native core identity")
+
     service_path = source / JAVA / "service/CoreVpnService.kt"
     service = service_path.read_text(encoding="utf-8")
     service = replace_once(service, "        configurePerAppProxy(builder)", "        if (!configurePerAppProxy(builder)) return false", "per-app start guard")
@@ -168,7 +175,7 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
     }''')
 
     # Validate all anchors before touching the checkout.
-    for path, content in ((gradle_path, gradle), (mmkv_path, mmkv), (settings_path, manager), (app_config_path, app_config), (service_path, service)):
+    for path, content in ((gradle_path, gradle), (mmkv_path, mmkv), (settings_path, manager), (app_config_path, app_config), (utils_path, utils), (service_path, service)):
         path.write_text(content, encoding="utf-8", newline="\n")
     (source / JAVA / "handler/CascadeDefaults.kt").write_text(defaults, encoding="utf-8", newline="\n")
     for template, destination in (

@@ -1,5 +1,6 @@
 package com.v2ray.ang.handler
 
+import com.v2ray.ang.util.Utils
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -13,6 +14,11 @@ import java.io.InputStream
 class CascadeDefaultsTest {
     @TempDir
     lateinit var directory: File
+
+    @Test
+    fun distributionUsesThePinnedXrayCoreWithItsOwnApplicationId() {
+        assertTrue(Utils.isXray())
+    }
 
     @Test
     fun repairsMissingDefaultsWithoutResettingUserChoices() {
