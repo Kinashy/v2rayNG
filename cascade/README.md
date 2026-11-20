@@ -32,7 +32,9 @@ custom databases. A failed copy leaves no partial target and is retried next tim
 The packaged databases come from the same stable
 `runetfreedom/russia-v2ray-rules-dat` release, verified against release digests,
 sizes, and SHA-256 checksum files. Their exact version and hashes appear in
-`build-report.json`. Existing geodata can be refreshed with the client's normal
+`build-report.json`. Every GeoIP and GeoSite category referenced by an enabled
+routing rule must also exist in the downloaded databases before a build can
+proceed. Existing geodata can be refreshed with the client's normal
 asset download action; repairing a missing file is separate from replacing one.
 
 ## Build and update channel

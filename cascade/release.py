@@ -15,7 +15,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from prepare import HERE, read_json
+from prepare import HERE, load_policy, read_json
 
 
 def request(url: str, *, api: bool = False) -> bytes:
@@ -49,6 +49,55 @@ def stable_release(repository: str, tag: str = ""):
     if release.get("draft") or release.get("prerelease"):
         raise ValueError("Only published stable upstream releases are supported")
     return release
+
+
+def protobuf_fields(data: bytes):
+    def varint(position):
+        value = 0
+        for shift in range(0, 70, 7):
+            if position >= len(data):
+                raise ValueError("Truncated geodata protobuf")
+            byte = data[position]
+            position += 1
+            value |= (byte & 127) << shift
+            if byte < 128:
+                return value, position
+        raise ValueError("Invalid geodata protobuf integer")
+
+    position = 0
+    while position < len(data):
+        tag, position = varint(position)
+        if tag & 7 == 0:
+            value, position = varint(position)
+        elif tag & 7 == 2:
+            size, position = varint(position)
+            end = position + size
+            if end > len(data):
+                raise ValueError("Truncated geodata protobuf field")
+            value, position = data[position:end], end
+        else:
+            raise ValueError("Unsupported geodata protobuf field")
+        yield tag >> 3, value
+
+
+def validate_geo_categories(directory: Path, rules: list) -> dict:
+    validated = {}
+    for kind, field in (("geoip", "ip"), ("geosite", "domain")):
+        required = {value[len(kind) + 1:].lower() for rule in rules if rule.get("enabled", True)
+                    for value in rule.get(field, []) if value.startswith(kind + ":")}
+        available = set()
+        for number, entry in protobuf_fields((directory / (kind + ".dat")).read_bytes()):
+            if number != 1 or not isinstance(entry, bytes):
+                continue
+            for part, value in protobuf_fields(entry):
+                if part == 1 and isinstance(value, bytes):
+                    available.add(value.decode("ascii").lower())
+                    break
+        missing = required - available
+        if missing:
+            raise ValueError(f"{kind}.dat is missing routing categories: {', '.join(sorted(missing))}")
+        validated[kind] = sorted(required)
+    return validated
 
 
 def download_asset(release: dict, name: str, destination: Path) -> dict:
@@ -114,6 +163,7 @@ def inputs(source: Path):
         metadata.extend((asset, checksum))
     report["geo_tag"] = geo["tag_name"]
     report["geo_assets"] = metadata
+    report["geo_routing_tags"] = validate_geo_categories(source / "V2rayNG/app/src/main/assets", load_policy()[1])
 
     native = source / "AndroidLibXrayLite"
     gitlink = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD:AndroidLibXrayLite"], text=True).strip()

@@ -59,11 +59,12 @@ class DistributionTests(unittest.TestCase):
         for draft in (False, True):
             with self.subTest(draft=draft), tempfile.TemporaryDirectory() as folder:
                 output = Path(folder) / "plan.json"
-                with patch.object(release, "stable_release", return_value={"tag_name": "2.3.15"}), patch.object(release, "api", return_value={"draft": draft}):
+                config = {"upstream_repository": "upstream/project", "repository": "owner/fork", "revision": 7}
+                with patch.object(release, "read_json", return_value=config), patch.object(release, "stable_release", return_value={"tag_name": "2.3.15"}), patch.object(release, "api", return_value={"draft": draft}):
                     release.plan("", output)
                 result = json.loads(output.read_text())
                 self.assertEqual(draft, result["build"])
-                self.assertEqual("v2.3.15.1", result["release_tag"])
+                self.assertEqual("v2.3.15.7", result["release_tag"])
 
     def test_apk_validation_rejects_missing_native_library(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -76,6 +77,26 @@ class DistributionTests(unittest.TestCase):
                 archive.writestr("AndroidManifest.xml", b"manifest")
             with self.assertRaisesRegex(ValueError, "Missing native library"):
                 release.package(source, root / "release")
+
+    def test_geodata_must_contain_the_categories_used_by_enabled_rules(self):
+        def database(code):
+            encoded = code.encode("ascii")
+            entry = b"\x0a" + bytes([len(encoded)]) + encoded
+            return b"\x0a" + bytes([len(entry)]) + entry
+
+        rules = [{"ip": ["geoip:ru"]}, {"domain": ["geosite:google"]},
+                 {"enabled": False, "domain": ["geosite:disabled"]}]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "geoip.dat").write_bytes(database("RU"))
+            (root / "geosite.dat").write_bytes(database("GOOGLE"))
+            self.assertEqual({"geoip": ["ru"], "geosite": ["google"]}, release.validate_geo_categories(root, rules))
+            (root / "geosite.dat").write_bytes(database("OTHER"))
+            with self.assertRaisesRegex(ValueError, "missing routing categories: google"):
+                release.validate_geo_categories(root, rules)
+            (root / "geoip.dat").write_bytes(b"\x0a\x64truncated")
+            with self.assertRaisesRegex(ValueError, "Truncated"):
+                release.validate_geo_categories(root, rules)
 
 
 if __name__ == "__main__":
