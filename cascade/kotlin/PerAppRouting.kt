@@ -11,7 +11,7 @@ internal fun configureSelectedApplications(
 ): Boolean {
     if (!enabled) return addDisallowed(self)
     if (bypass) {
-        (selected + self).forEach(addDisallowed)
+        (selected + self).forEach { addDisallowed(it) }
         return true
     }
     var allowed = 0

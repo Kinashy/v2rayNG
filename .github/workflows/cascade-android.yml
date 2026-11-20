@@ -77,16 +77,36 @@ jobs:
         run: |
           sdkmanager --install 'ndk;30.0.16248370'
           echo "NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> "$GITHUB_ENV"
+      - name: Identify the pinned HEV source
+        id: hev
+        run: echo "revision=$(git -C source/hev-socks5-tunnel rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Restore compiled HEV libraries
+        id: hev-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: source/libs
+          key: cascade-hev-${{ runner.os }}-ndk30-${{ steps.hev.outputs.revision }}-${{ hashFiles('source/compile-hevtun.sh') }}
       - name: Build native libraries for all supported ABIs
+        if: steps.hev-cache.outputs.cache-hit != 'true'
         working-directory: source
-        run: |
-          bash compile-hevtun.sh
-          cp -r libs/* V2rayNG/app/libs/
+        run: bash compile-hevtun.sh
+      - name: Cache compiled HEV libraries
+        if: steps.hev-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: source/libs
+          key: cascade-hev-${{ runner.os }}-ndk30-${{ steps.hev.outputs.revision }}-${{ hashFiles('source/compile-hevtun.sh') }}
+      - name: Stage native libraries
+        run: cp -r source/libs/* source/V2rayNG/app/libs/
       - name: Setup Java
         uses: actions/setup-java@v6.3.0
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            source/V2rayNG/gradle/wrapper/gradle-wrapper.properties
+            source/V2rayNG/gradle/libs.versions.toml
       - name: Configure Gradle
         working-directory: source/V2rayNG
         run: |
