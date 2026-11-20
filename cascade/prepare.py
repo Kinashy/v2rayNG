@@ -189,6 +189,8 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
         "schema": 1, "name": config["name"], "application_id": config["application_id"],
         "version": version, "base_version_code": version_code, "upstream_tag": upstream_tag,
         "policy_version": policy["version"], "routing_count": len(rules), "application_count": len(apps),
+        "routing_sha256": policy["files"]["routing.json"], "apps_sha256": policy["files"]["apps.json"],
+        "settings_sha256": config["settings_sha256"],
         "profile_count": 0, "asset_repair": "missing files and entries only; preserve existing contents",
     }
     (source / "cascade-build.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
