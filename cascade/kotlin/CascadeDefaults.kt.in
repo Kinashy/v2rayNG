@@ -7,7 +7,9 @@ import java.io.InputStream
 /** Distribution defaults and their repair policy; user profiles remain owned by upstream. */
 internal object CascadeDefaults {
     const val DNS_MIGRATION_KEY = "cascade_dns_defaults_version"
-    const val DNS_MIGRATION_VERSION = 1
+    const val DNS_MIGRATION_VERSION = 2
+
+    internal val previousRouting = @LEGACY_ROUTING@
 
     val settings: Map<String, Any> = linkedMapOf(
 @SETTINGS@
@@ -18,10 +20,13 @@ internal object CascadeDefaults {
     )
 
     /** Only the complete factory DNS tuple from releases .1/.2 is eligible for replacement. */
-    private val legacyDnsSettings: Map<String, Any> = linkedMapOf(
-        "pref_local_dns_enabled" to false,
-        "pref_remote_dns" to "https://cloudflare-dns.com/dns-query",
-        "pref_domestic_dns" to "223.5.5.5"
+    private val legacyDnsSettings: List<Map<String, Any>> = listOf(
+        mapOf("pref_local_dns_enabled" to false,
+            "pref_remote_dns" to "https://cloudflare-dns.com/dns-query",
+            "pref_domestic_dns" to "223.5.5.5"),
+        mapOf("pref_local_dns_enabled" to true,
+            "pref_remote_dns" to "https://1.1.1.1/dns-query",
+            "pref_domestic_dns" to "https://1.1.1.1/dns-query")
     )
 
     /** Seed and migrate in one locked transaction; restore old values if any write fails. */
@@ -32,10 +37,12 @@ internal object CascadeDefaults {
     ) {
         val changes = settings.filterKeys { it !in existing }.toMutableMap()
         if ((existing[DNS_MIGRATION_KEY] as? Int ?: 0) < DNS_MIGRATION_VERSION) {
-            if (legacyDnsSettings.all { (key, value) -> existing[key] == value } &&
+            if (legacyDnsSettings.any { tuple -> tuple.all { (key, value) -> existing[key] == value } } &&
+                existing["pref_routing_ruleset"] == previousRouting &&
+                existing["pref_vpn_dns"] == "1.1.1.1" &&
                 (existing["pref_fake_dns_enabled"] == null || existing["pref_fake_dns_enabled"] == false)
             ) {
-                (legacyDnsSettings.keys + "pref_fake_dns_enabled").forEach { key ->
+                (legacyDnsSettings.first().keys + "pref_fake_dns_enabled" + "pref_routing_ruleset").forEach { key ->
                     changes[key] = settings.getValue(key)
                 }
             }

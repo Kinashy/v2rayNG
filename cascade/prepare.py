@@ -112,6 +112,8 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
     asset_lines = [f'        "{name}" to "{geo_base}{name}",' for name in ("geoip.dat", "geosite.dat")]
     defaults = (HERE / "kotlin/CascadeDefaults.kt.in").read_text(encoding="utf-8")
     defaults = defaults.replace("@SETTINGS@", "\n".join(generated_settings)).replace("@ASSETS@", "\n".join(asset_lines))
+    previous_routing = read_json(HERE / "policy/legacy-routing.json")
+    defaults = defaults.replace("@LEGACY_ROUTING@", kotlin_string(json.dumps(previous_routing, ensure_ascii=False, separators=(",", ":"))))
 
     mmkv_path = source / JAVA / "handler/MmkvManager.kt"
     mmkv = mmkv_path.read_text(encoding="utf-8")
@@ -236,7 +238,7 @@ def prepare(source: Path, upstream_tag: str, config_path: Path | None = None) ->
         "routing_sha256": policy["files"]["routing.json"], "apps_sha256": policy["files"]["apps.json"],
         "settings_sha256": config["settings_sha256"],
         "profile_count": 0, "asset_repair": "missing files and entries only; preserve existing contents",
-        "dns_migration": "v1: replace the complete legacy factory DNS tuple once; preserve custom settings",
+        "dns_migration": "v2: atomically replace exact legacy factory DNS and routing; preserve custom settings",
     }
     (source / "cascade-build.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report

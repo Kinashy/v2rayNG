@@ -4,7 +4,7 @@ Android distribution of v2rayNG with the shared Cascade client policy. Install t
 universal APK from this fork's Releases, import your personal VLESS profile using
 QR or clipboard, select it, and approve Android's VPN request.
 
-The APK contains no user profile. DNS and other defaults, 24 routing rules, and
+The APK contains no user profile. DNS and other defaults, 26 routing rules, and
 13 selected application packages come from `policy/`. The original files were
 copied from the administrator wizard's `client/templates/common/` and
 `client/templates/android/settings.json`. Routing and application checksums are
@@ -21,16 +21,19 @@ can change their selection in the regular per-app settings.
 
 Distribution defaults fill absent setting keys, including on later launches.
 Existing false, empty, and customized values are retained, with one versioned
-exception for the complete factory DNS tuple from releases .1/.2. On the first
-launch after upgrading, local DNS is enabled, Remote and Domestic DNS both use
-`https://1.1.1.1/dns-query`, and Fake DNS is disabled. VPN DNS remains the IP
-`1.1.1.1`. This replaces the previous tuple of disabled local DNS,
-`https://cloudflare-dns.com/dns-query`, and unencrypted `223.5.5.5`.
+exception for complete factory DNS tuples from releases .1/.2/.3 together with
+the exact previous factory routing. Remote DNS uses private `172.29.172.254`
+through the cascade; Direct DNS uses `https://8.8.8.8/dns-query` directly.
+Local DNS is enabled, Fake DNS disabled, and VPN DNS remains `1.1.1.1`.
+Install and verify server-side AmneziaDNS before publishing this distribution.
 
-Changing any of those legacy DNS values or enabling Fake DNS preserves the user's
-DNS tuple. Migration is recorded once; later user changes are retained even if
+Changing legacy DNS values, enabling Fake DNS, or customizing routing preserves
+both DNS and routing. Migration is recorded once; later user changes are retained even if
 they restore an old value. Seeding and migration share the MMKV settings lock and
 roll back changed values on a failed write. Profiles are not reimported.
+The two endpoint rules precede private/direct rules; the final direct fallback
+stays last. Native endpoint lookup still uses Android DNS. No upstream core or
+configuration-generator changes are required for this DNS policy.
 Profile, subscription,
 selected-server, and statistics stores are never seeded by the distribution.
 

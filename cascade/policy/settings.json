@@ -109,7 +109,7 @@
   },
   "pref_remote_dns": {
     "type": "s",
-    "value": "https://1.1.1.1/dns-query"
+    "value": "172.29.172.254"
   },
   "pref_geo_files_sources": {
     "type": "s",
@@ -133,7 +133,7 @@
   },
   "pref_domestic_dns": {
     "type": "s",
-    "value": "https://1.1.1.1/dns-query"
+    "value": "https://8.8.8.8/dns-query"
   },
   "pref_vpn_mtu": {
     "type": "s",

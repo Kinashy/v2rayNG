@@ -35,8 +35,8 @@ class CascadeBootstrapTest {
         assertFalse(MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS))
         assertTrue(MmkvManager.decodeSettingsBool(AppConfig.PREF_LOCAL_DNS_ENABLED))
         assertFalse(MmkvManager.decodeSettingsBool(AppConfig.PREF_FAKE_DNS_ENABLED))
-        assertEquals("https://1.1.1.1/dns-query", MmkvManager.decodeSettingsString(AppConfig.PREF_REMOTE_DNS))
-        assertEquals("https://1.1.1.1/dns-query", MmkvManager.decodeSettingsString(AppConfig.PREF_DOMESTIC_DNS))
+        assertEquals("172.29.172.254", MmkvManager.decodeSettingsString(AppConfig.PREF_REMOTE_DNS))
+        assertEquals("https://8.8.8.8/dns-query", MmkvManager.decodeSettingsString(AppConfig.PREF_DOMESTIC_DNS))
         for (name in listOf("geoip.dat", "geosite.dat")) {
             assertTrue(File(Utils.userAssetPath(context), name).length() > 0)
         }
@@ -86,6 +86,7 @@ class CascadeBootstrapTest {
         MmkvManager.encodeSettings(AppConfig.PREF_REMOTE_DNS, "https://cloudflare-dns.com/dns-query")
         MmkvManager.encodeSettings(AppConfig.PREF_DOMESTIC_DNS, "223.5.5.5")
         MmkvManager.encodeSettings(AppConfig.PREF_FAKE_DNS_ENABLED, false)
+        MmkvManager.encodeSettings(AppConfig.PREF_ROUTING_RULESET, CascadeDefaults.previousRouting)
         MmkvManager.encodeSettings(CascadeDefaults.DNS_MIGRATION_KEY, null as String?)
         assertEquals(-1, MmkvManager.decodeSettingsInt(CascadeDefaults.DNS_MIGRATION_KEY, -1))
     }
@@ -95,13 +96,13 @@ class CascadeBootstrapTest {
         SettingsManager.initApp(context)
         assertTrue(MmkvManager.decodeSettingsBool(AppConfig.PREF_LOCAL_DNS_ENABLED))
         assertFalse(MmkvManager.decodeSettingsBool(AppConfig.PREF_FAKE_DNS_ENABLED))
-        assertEquals("https://1.1.1.1/dns-query", MmkvManager.decodeSettingsString(AppConfig.PREF_REMOTE_DNS))
-        assertEquals("https://1.1.1.1/dns-query", MmkvManager.decodeSettingsString(AppConfig.PREF_DOMESTIC_DNS))
+        assertEquals("172.29.172.254", MmkvManager.decodeSettingsString(AppConfig.PREF_REMOTE_DNS))
+        assertEquals("https://8.8.8.8/dns-query", MmkvManager.decodeSettingsString(AppConfig.PREF_DOMESTIC_DNS))
         val guid = MmkvManager.decodeSettingsString("cascade_test_profile_guid")!!
         assertEquals(listOf(guid), MmkvManager.decodeAllServerList())
         assertEquals(guid, MmkvManager.getSelectServer())
         assertNotNull(MmkvManager.decodeServerConfig(guid))
-        assertEquals("User routing retained", MmkvManager.decodeRoutingRulesets()!!.first().remarks)
+        assertEquals("cascade-remote-dns", MmkvManager.decodeRoutingRulesets()!!.first().id)
         assertTrue(MmkvManager.decodeSettingsStringSet(AppConfig.PREF_PER_APP_PROXY_SET)!!.contains("com.android.settings"))
         verifyDnsConfig(guid)
         // Once migrated, explicit later changes must survive another initialization.
@@ -120,7 +121,9 @@ class CascadeBootstrapTest {
         assertTrue(servers.size() > 0)
         assertTrue(servers.all {
             (if (it.isJsonPrimitive) it.asString else it.asJsonObject["address"].asString) ==
-                "https://1.1.1.1/dns-query"
+                "172.29.172.254" ||
+                (if (it.isJsonPrimitive) it.asString else it.asJsonObject["address"].asString) ==
+                "https://8.8.8.8/dns-query"
         })
         assertTrue(config["outbounds"].asJsonArray.any {
             it.asJsonObject["tag"].asString == "dns-out" && it.asJsonObject["protocol"].asString == "dns"
@@ -129,6 +132,14 @@ class CascadeBootstrapTest {
             it.asJsonObject["outboundTag"]?.asString == "dns-out" &&
                 it.asJsonObject["port"]?.asString == "53"
         })
+        val rules = config["routing"].asJsonObject["rules"].asJsonArray.map { it.asJsonObject }
+        val remote = rules.indexOfFirst { it["ip"]?.toString()?.contains("172.29.172.254/32") == true }
+        val direct = rules.indexOfFirst { it["ip"]?.toString()?.contains("8.8.8.8/32") == true }
+        val fallback = rules.indexOfFirst { it["port"]?.asString == "0-65535" }
+        val privateRule = rules.indexOfFirst { it["ip"]?.toString()?.contains("private") == true }
+        assertTrue(remote >= 0 && direct > remote && fallback > direct && privateRule > remote)
+        assertEquals("proxy", rules[remote]["outboundTag"].asString)
+        assertEquals("direct", rules[direct]["outboundTag"].asString)
     }
 
     private fun verifyConcurrentAssetMutation() {

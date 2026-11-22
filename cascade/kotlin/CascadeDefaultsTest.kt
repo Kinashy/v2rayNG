@@ -46,6 +46,7 @@ class CascadeDefaultsTest {
         this["pref_local_dns_enabled"] = false
         this["pref_remote_dns"] = "https://cloudflare-dns.com/dns-query"
         this["pref_domestic_dns"] = "223.5.5.5"
+        this["pref_routing_ruleset"] = CascadeDefaults.previousRouting
         remove("pref_fake_dns_enabled")
     }
 
@@ -59,18 +60,17 @@ class CascadeDefaultsTest {
             this["pref_per_app_proxy"] = false
             this["selected_server_fixture"] = "unchanged"
         }
-        val originalRouting = stored["pref_routing_ruleset"]
         val originalApps = stored["pref_per_app_proxy_set"]
         upgrade(stored)
         assertEquals(true, stored["pref_local_dns_enabled"])
         assertEquals(false, stored["pref_fake_dns_enabled"])
-        assertEquals("https://1.1.1.1/dns-query", stored["pref_remote_dns"])
-        assertEquals("https://1.1.1.1/dns-query", stored["pref_domestic_dns"])
+        assertEquals("172.29.172.254", stored["pref_remote_dns"])
+        assertEquals("https://8.8.8.8/dns-query", stored["pref_domestic_dns"])
         assertEquals("1.1.1.1", stored["pref_vpn_dns"])
         assertEquals(CascadeDefaults.DNS_MIGRATION_VERSION, stored[CascadeDefaults.DNS_MIGRATION_KEY])
         assertEquals(false, stored["pref_per_app_proxy"])
         assertEquals("unchanged", stored["selected_server_fixture"])
-        assertEquals(originalRouting, stored["pref_routing_ruleset"])
+        assertEquals(CascadeDefaults.settings["pref_routing_ruleset"], stored["pref_routing_ruleset"])
         assertEquals(originalApps, stored["pref_per_app_proxy_set"])
         stored["pref_local_dns_enabled"] = false
         stored["pref_remote_dns"] = "https://example.invalid/custom-dns"
@@ -103,7 +103,7 @@ class CascadeDefaultsTest {
     fun rollsBackEveryDnsWriteIncludingTheMigrationMarkerAndCanRetry() {
         for (throws in listOf(false, true)) {
             for (failedKey in listOf("pref_fake_dns_enabled", "pref_local_dns_enabled",
-                "pref_remote_dns", "pref_domestic_dns", CascadeDefaults.DNS_MIGRATION_KEY)) {
+                "pref_remote_dns", "pref_domestic_dns", "pref_routing_ruleset", CascadeDefaults.DNS_MIGRATION_KEY)) {
                 val stored = legacySettings()
                 val before = stored.toMap()
                 var failed = false
@@ -123,6 +123,23 @@ class CascadeDefaultsTest {
                 assertEquals(CascadeDefaults.DNS_MIGRATION_VERSION, stored[CascadeDefaults.DNS_MIGRATION_KEY])
             }
         }
+    }
+
+    @Test
+    fun upgradesCloudflareDefaultsFromRevisionThreeButKeepsCustomRouting() {
+        val stored = legacySettings().apply {
+            this["pref_local_dns_enabled"] = true
+            this["pref_remote_dns"] = "https://1.1.1.1/dns-query"
+            this["pref_domestic_dns"] = "https://1.1.1.1/dns-query"
+            this[CascadeDefaults.DNS_MIGRATION_KEY] = 1
+        }
+        upgrade(stored)
+        assertEquals("172.29.172.254", stored["pref_remote_dns"])
+        assertEquals(CascadeDefaults.settings["pref_routing_ruleset"], stored["pref_routing_ruleset"])
+        val customized = legacySettings().apply { this["pref_routing_ruleset"] = "[]" }
+        upgrade(customized)
+        assertEquals("[]", customized["pref_routing_ruleset"])
+        assertEquals("https://cloudflare-dns.com/dns-query", customized["pref_remote_dns"])
     }
 
     @Test

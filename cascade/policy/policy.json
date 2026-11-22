@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "domain_strategy": "IPOnDemand",
-  "routing_count": 24,
+  "routing_count": 26,
   "files": {
-    "routing.json": "dc921da4a5c339660de82f817c872cf58f16c95888073933555c939fb19ff3b3",
+    "routing.json": "e10eee4b145ba21ccead1d0aecd1dd105841a057563b554c4c758894565c62a0",
     "apps.json": "933eced8a29e2e37d38ad35f32eb4a6bd44b07ce3cf5af3c685538dbbcf9dc83"
   }
 }

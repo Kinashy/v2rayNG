@@ -216,7 +216,9 @@ jobs:
           Install the universal APK, then import your personal profile by QR or clipboard.
           DNS, routing, selected applications and verified geodata are included.
           On first launch, the old factory DNS settings are upgraded automatically:
-          local DNS enabled, Remote/Domestic DNS over HTTPS, Fake DNS disabled.
+          local DNS enabled, private Remote DNS through the cascade, Google Direct DoH, Fake DNS disabled.
+          The previous factory routing receives two DNS endpoint exceptions; customized routing is retained.
+          Server-side AmneziaDNS must already be installed on every used exit.
           Customized DNS values and all personal profiles are retained.
           Missing required assets are restored; existing user data is preserved.
 

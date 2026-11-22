@@ -1,5 +1,27 @@
 [
   {
+    "id": "cascade-remote-dns",
+    "remarks": "Remote DNS через каскад",
+    "enabled": true,
+    "outboundTag": "proxy",
+    "ip": [
+      "172.29.172.254/32"
+    ],
+    "port": "53",
+    "network": "tcp,udp"
+  },
+  {
+    "id": "cascade-direct-dns",
+    "remarks": "Direct DNS: Google DoH напрямую",
+    "enabled": true,
+    "outboundTag": "direct",
+    "ip": [
+      "8.8.8.8/32"
+    ],
+    "port": "443",
+    "network": "tcp"
+  },
+  {
     "id": "olezha-bittorrent",
     "remarks": "Торрент напрямую",
     "enabled": true,
