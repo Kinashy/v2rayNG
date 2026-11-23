@@ -14,7 +14,9 @@ import release
 class DistributionTests(unittest.TestCase):
     def test_shared_policy_is_complete_and_has_no_personal_profile(self):
         metadata, rules, apps, settings = prepare.load_policy()
-        self.assertEqual(26, len(rules))
+        self.assertEqual(25, len(rules))
+        self.assertFalse(any(rule["id"] == "olezha-teams" for rule in rules))
+        self.assertNotIn("teams.microsoft.com", json.dumps(rules))
         self.assertEqual(13, len(apps))
         self.assertEqual("IPOnDemand", metadata["domain_strategy"])
         self.assertEqual("cascade-remote-dns", rules[0]["id"])

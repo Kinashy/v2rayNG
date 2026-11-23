@@ -5,6 +5,6 @@
   "repository": "Kinashy/v2rayNG",
   "upstream_repository": "2dust/v2rayNG",
   "geo_repository": "runetfreedom/russia-v2ray-rules-dat",
-  "revision": 4,
+  "revision": 5,
   "settings_sha256": "a9125ceb636ab9d3004f96de7c6ac39db045dc353453368ca16f55203f427204"
 }
