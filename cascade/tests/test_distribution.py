@@ -14,7 +14,12 @@ import release
 class DistributionTests(unittest.TestCase):
     def test_shared_policy_is_complete_and_has_no_personal_profile(self):
         metadata, rules, apps, settings = prepare.load_policy()
-        self.assertEqual(25, len(rules))
+        self.assertEqual(26, len(rules))
+        microsoft = [rule for rule in rules if rule["id"] == "olezha-microsoft"]
+        self.assertEqual(1, len(microsoft))
+        self.assertTrue(microsoft[0]["enabled"])
+        self.assertEqual("direct", microsoft[0]["outboundTag"])
+        self.assertEqual(["geosite:microsoft"], microsoft[0]["domain"])
         self.assertFalse(any(rule["id"] == "olezha-teams" for rule in rules))
         self.assertNotIn("teams.microsoft.com", json.dumps(rules))
         self.assertEqual(13, len(apps))

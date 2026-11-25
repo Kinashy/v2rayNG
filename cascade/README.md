@@ -4,7 +4,7 @@ Android distribution of v2rayNG with the shared Cascade client policy. Install t
 universal APK from this fork's Releases, import your personal VLESS profile using
 QR or clipboard, select it, and approve Android's VPN request.
 
-The APK contains no user profile. DNS and other defaults, 25 routing rules, and
+The APK contains no user profile. DNS and other defaults, 26 routing rules, and
 13 selected application packages come from `policy/`. The original files were
 copied from the administrator wizard's `client/templates/common/` and
 `client/templates/android/settings.json`. Routing and application checksums are

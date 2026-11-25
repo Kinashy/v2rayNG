@@ -27,7 +27,7 @@ class CascadeBootstrapTest {
         SettingsManager.initApp(context)
         SettingsManager.initAssets(context, context.assets)
         assertTrue(MmkvManager.decodeAllServerList().isEmpty())
-        assertEquals(25, MmkvManager.decodeRoutingRulesets()!!.size)
+        assertEquals(26, MmkvManager.decodeRoutingRulesets()!!.size)
         assertEquals("IPOnDemand", MmkvManager.decodeSettingsString(AppConfig.PREF_ROUTING_DOMAIN_STRATEGY))
         assertTrue(Utils.isXray())
         assertEquals(SettingsManager.getSocksPort(), SettingsManager.getHttpPort())

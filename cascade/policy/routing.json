@@ -207,6 +207,15 @@
     ]
   },
   {
+    "id": "olezha-microsoft",
+    "remarks": "Microsoft напрямую",
+    "enabled": true,
+    "outboundTag": "direct",
+    "domain": [
+      "geosite:microsoft"
+    ]
+  },
+  {
     "id": "olezha-ru-domains",
     "remarks": "Российские домены напрямую",
     "enabled": true,
